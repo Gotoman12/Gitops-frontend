@@ -45,7 +45,30 @@ pipeline {
                 sh "docker push ${IMAGE_NAME}"
             }
         }
+        stage('Update GitOps Deployment') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-creds',
+                    usernameVariable: 'GIT_USERNAME',
+                    passwordVariable: 'GIT_PASSWORD'
+                )]) {
+                    sh '''
+                        git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/ITkannadigaru/GitOps.git gitops
+                        cd gitops/base/frontend
 
+                        git config user.email "jenkins@ci.com"
+                        git config user.name "jenkins"
+
+                        # Update image tag
+                        sed -i "s|image: .*frontend.*|image: ${IMAGE_NAME}|g" frontend/deployment.yaml
+
+                        git add .
+                        git commit -m "Update frontend image to ${IMAGE_NAME}"
+                        git push origin main
+                    '''
+                }
+            }
+        }
     }
 
     post {
