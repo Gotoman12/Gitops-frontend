@@ -1,6 +1,8 @@
 pipeline {
     agent any
-
+ tools{
+    Go 'go'
+ }
         environment {
         AWS_REGION      = "us-east-1"
         AWS_ACCOUNT_ID  = "985059095589"
