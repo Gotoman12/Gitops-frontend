@@ -1,9 +1,15 @@
 pipeline {
     agent any
 
-    environment {
-        IMAGE_NAME = "manojkrishnappa/frontend:${GIT_COMMIT}"
+        environment {
+        AWS_REGION      = "us-east-1"
+        AWS_ACCOUNT_ID  = "985059095589"
+        ECR_REPO_NAME   = "gitops-agrocd-frontend"
+        IMAGE_TAG       = "${BUILD_NUMBER}"
+        ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_NAME      = "${ECR_REGISTRY}/${ECR_REPO_NAME}:${IMAGE_TAG}"
     }
+
 
     stages {
 
@@ -27,64 +33,26 @@ pipeline {
                 '''
             }
         }
-
-        stage('Login to Docker Hub') {
+         stage('Login to ECR') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'docker-hub-creds',
-                    usernameVariable: 'DOCKER_USERNAME',
-                    passwordVariable: 'DOCKER_PASSWORD'
+                    credentialsId: 'aws-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
-                    sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
+                    sh """
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        aws ecr get-login-password --region ${AWS_REGION} | \
+                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                    """
                 }
             }
         }
-
         stage('Push to Docker Hub') {
             steps {
                 sh "docker push ${IMAGE_NAME}"
             }
-        }
-        stage('Update GitOps Deployment') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'github-creds',
-                    usernameVariable: 'GIT_USERNAME',
-                    passwordVariable: 'GIT_PASSWORD'
-                )]) {
-                    sh '''
-                        if [ -d "gitops" ]; then
-                            echo "gitops directory exists. Removing it..."
-                            rm -rf gitops
-                        fi
-                        git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/ITkannadigaru/GitOps.git gitops
-                        cd gitops/base/frontend/
-
-                        git config user.email "jenkins@ci.com"
-                        git config user.name "jenkins"
-
-                        # Update image tag
-                        sed -i "s|image: .*frontend.*|image: ${IMAGE_NAME}|g" deployment.yaml
-
-                        git add .
-                        git commit -m "Update frontend image to ${IMAGE_NAME}"
-                        git push origin main
-                    '''
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            sh "docker rmi ${IMAGE_NAME} || true"
-            sh "docker logout || true"
-        }
-        success {
-            echo "Build and push successful: ${IMAGE_NAME}"
-        }
-        failure {
-            echo "Pipeline failed. Check the logs above."
         }
     }
 }
