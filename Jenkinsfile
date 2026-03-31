@@ -33,19 +33,23 @@ pipeline {
                 '''
             }
         }
-         stage('Login to ECR') {
+       stage('Load AWS Secrets') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'aws-creds',
-                    usernameVariable: 'AWS_ACCESS_KEY_ID',
-                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                )]) {
-                    sh """
-                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        aws ecr get-login-password --region ${AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                    """
+                script {
+                    def secretJson = sh(
+                        script: '''
+                            aws secretsmanager get-secret-value \
+                                --secret-id awslogin \
+                                --region ${AWS_REGION} \
+                                --query SecretString \
+                                --output text
+                        ''',
+                        returnStdout: true
+                    ).trim()
+
+                    def secrets = readJSON text: secretJson
+                    env.AWS_ACCESS_KEY_ID = secrets.access-id
+                    env.AWS_SECRET_ACCESS_KEY = secrets.secret
                 }
             }
         }
