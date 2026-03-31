@@ -40,18 +40,27 @@ pipeline {
        stage('Load AWS Secrets') {
             steps {
                 script {
-                    def secretJson = sh(
-                        script: '''
-                            aws secretsmanager get-secret-value \
+                    def accessKey = sh(
+                            script: """
+                                aws secretsmanager get-secret-value \
                                 --secret-id awslogin \
                                 --region ${AWS_REGION} \
                                 --query SecretString \
-                                --output text
-                        ''',
-                        returnStdout: true
-                    ).trim()
+                                --output text | jq -r '.["access-id"]'
+                            """,
+                            returnStdout: true
+                        ).trim()
+                    def secretKey = sh(
+                            script: """
+                                aws secretsmanager get-secret-value \
+                                --secret-id awslogin \
+                                --region ${AWS_REGION} \
+                                --query SecretString \
+                                --output text | jq -r '.secret'
+                            """,
+                           returnStdout: true
+                           ).trim()
 
-                    def secrets = new groovy.json.JsonSlurperClassic().parseText(secretJson)
                     env.AWS_ACCESS_KEY_ID = secrets['access-id']
                     env.AWS_SECRET_ACCESS_KEY = secrets['secret']
                 }
