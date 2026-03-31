@@ -47,9 +47,9 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def secrets = readJSON text: secretJson
-                    env.AWS_ACCESS_KEY_ID = secrets.access-id
-                    env.AWS_SECRET_ACCESS_KEY = secrets.secret
+                    def secrets = new groovy.json.JsonSlurperClassic().parseText(secretJson)
+                    env.AWS_ACCESS_KEY_ID = secrets['access-id']
+                    env.AWS_SECRET_ACCESS_KEY = secrets['secret']
                 }
             }
         }
