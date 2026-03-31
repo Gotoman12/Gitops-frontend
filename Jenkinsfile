@@ -60,7 +60,7 @@ pipeline {
                 '''
             }
         }
-        stage('Push to Docker Hub') {
+        stage('Push to ecr') {
             steps {
                 sh "docker push ${IMAGE_NAME}"
             }
